@@ -7,10 +7,11 @@ Complete guide, wiring diagrams, mobile app setup, and firmware for the **4-Whee
 ## 📋 Table of Contents
 1. [System Overview & Hardware Components](#1-system-overview--hardware-components)
 2. [Why Two L298N Drivers?](#2-why-two-l298n-drivers)
-3. [Full Circuit Wiring Diagram & Pinout Tables](#3-full-circuit-wiring-diagram--pinout-tables)
-   - [A. ESP32 to Motor Drivers (Control Signals)](#a-esp32-to-motor-drivers-control-signals)
-   - [B. Motor Driver to TT Motors](#b-motor-driver-to-tt-motors)
-   - [C. Power & Common Ground (Crucial!)](#c-power--common-ground-crucial)
+3. [Full Circuit Wiring Diagram & Breadboard Distribution](#3-full-circuit-wiring-diagram--breadboard-distribution)
+   - [Breadboard Top-Down Layout Map](#how-the-breadboard-works-as-a-distribution-hub)
+   - [A. Breadboard Row-by-Row Connection Table](#a-breadboard-row-by-row-connection-table)
+   - [B. Motor Driver Screw Terminals to TT Motors](#b-motor-driver-screw-terminals-to-wheels)
+   - [C. Power & Common Ground Distribution](#c-power--common-ground-distribution-eliminating-twisted-wires)
    - [D. ENA & ENB Jumpers Explained](#d-ena--enb-jumpers-explained)
 4. [Arduino IDE Installation & Flashing](#4-arduino-ide-installation--flashing)
 5. [Serial Bluetooth Terminal App Setup](#5-serial-bluetooth-terminal-app-setup)
@@ -45,82 +46,102 @@ Using two drivers prevents thermal throttling, gives maximum torque to all 4 whe
 
 ---
 
-## 3. Full Circuit Wiring Diagram & Pinout Tables
+## 3. Full Circuit Wiring Diagram & Breadboard Distribution
 
-### A. ESP32 to Motor Drivers (Control Signals)
-
-The ESP32 pins are routed via your breadboard so that control signals are shared cleanly:
-
-| ESP32 Pin (DevKit V1) | Label on Board | Driver 1 (Left Driver) | Driver 2 (Right Driver) | Function |
-| :--- | :--- | :--- | :--- | :--- |
-| **GPIO 14** | `D14` | **ENA** *(jumper off)* | **ENA** *(jumper off)* | Left Side Speed (PWM) |
-| **GPIO 27** | `D27` | **IN1** | — | Left Side Forward |
-| **GPIO 26** | `D26` | **IN2** | — | Left Side Backward |
-| **GPIO 25** | `D25` | — | **IN3** | Right Side Forward |
-| **GPIO 33** | `D33` | — | **IN4** | Right Side Backward |
-| **GPIO 32** | `D32` | — | **ENB** *(jumper off)* | Right Side Speed (PWM) |
-
-> **Note on Wiring Both Channels on Each Driver:**
-> Since each L298N has two motor channels (Channel A: OUT1/OUT2, Channel B: OUT3/OUT4):
-> - On **Driver 1 (Left Side)**:
->   - Connect ESP32 `D27` to both **IN1** and **IN3**.
->   - Connect ESP32 `D26` to both **IN2** and **IN4**.
->   - Connect ESP32 `D14` to both **ENA** and **ENB** (or bridge them).
-> - On **Driver 2 (Right Side)**:
->   - Connect ESP32 `D25` to both **IN1** and **IN3**.
->   - Connect ESP32 `D33` to both **IN2** and **IN4**.
->   - Connect ESP32 `D32` to both **ENA** and **ENB** (or bridge them).
+### ⚠️ IMPORTANT SAFETY ALERT (Based on your latest photo)
+> In your latest setup photo, there are **bare, exposed copper wires twisted together** on the red power lines and white wire. 
+> - **Risk**: If exposed copper touches the acrylic chassis edges, motor terminals, or the ESP32 pins, it will cause an immediate **short circuit** that will burn the ESP32 chip or the L298N drivers!
+> - **Solution**: **Do NOT twist bare wires.** Instead, use the **Breadboard Power Rails** or screw terminals directly as explained below.
 
 ---
 
-### B. Motor Driver to TT Motors
+### How the Breadboard Works as a Distribution Hub
 
-#### Driver 1 (Left Side Motors):
-- **OUT1 & OUT2** (Screw Terminal 1) ➔ **Front-Left Motor** (Red & Black wires)
-- **OUT3 & OUT4** (Screw Terminal 2) ➔ **Rear-Left Motor** (Red & Black wires)
+In a 4WD car with two L298N drivers, the breadboard acts as a **central splitter**:
+1. **Each vertical row (5 holes)** connects one ESP32 signal pin to **both** motor drivers at the same time.
+2. **The long horizontal rails (`+` and `-`)** distribute Common Ground and Power cleanly without any messy twisted wires.
 
-#### Driver 2 (Right Side Motors):
-- **OUT1 & OUT2** (Screw Terminal 1) ➔ **Front-Right Motor** (Red & Black wires)
-- **OUT3 & OUT4** (Screw Terminal 2) ➔ **Rear-Right Motor** (Red & Black wires)
+```
+ BREADBOARD LAYOUT MAP (Top-Down View):
+ ═══════════════════════════════════════════════════════════════════════════════════════════════
+  [-] POWER RAIL (COMMON GND):   [Battery (-)]  [Driver 1 GND]  [Driver 2 GND]  [ESP32 GND]
+  [+] POWER RAIL (BATTERY 12V):  [Battery (+)]  [Driver 1 12V]  [Driver 2 12V]  (Eliminates twisted wires!)
+ ───────────────────────────────────────────────────────────────────────────────────────────────
+  ROW 1:  [ESP32 D14 (PWM)]  ────>  [Driver 1 ENA]         ────>  [Driver 2 ENA]   (Left Speed)
+  ROW 2:  [ESP32 D27 (DIR)]  ────>  [Driver 1 IN1]         ────>  [Driver 2 IN1]   (Left Forward)
+  ROW 3:  [ESP32 D26 (DIR)]  ────>  [Driver 1 IN2]         ────>  [Driver 2 IN2]   (Left Backward)
+  ROW 4:  [ESP32 D25 (DIR)]  ────>  [Driver 1 IN3]         ────>  [Driver 2 IN3]   (Right Forward)
+  ROW 5:  [ESP32 D33 (DIR)]  ────>  [Driver 1 IN4]         ────>  [Driver 2 IN4]   (Right Backward)
+  ROW 6:  [ESP32 D32 (PWM)]  ────>  [Driver 1 ENB]         ────>  [Driver 2 ENB]   (Right Speed)
+ ═══════════════════════════════════════════════════════════════════════════════════════════════
+```
 
 ---
 
-### C. Power & Common Ground (Crucial!)
+### A. Breadboard Row-by-Row Connection Table
 
-> ⚠️ **CRITICAL: COMMON GROUND**  
-> You **MUST** connect the **GND** of your battery pack, the **GND** of Driver 1, the **GND** of Driver 2, and the **GND** of the ESP32 together! If grounds are not connected together, the logic signals will float and motors will behave erratically or refuse to move.
+Plug jumper wires into the same breadboard row to bridge them together:
 
-```
-       [ BATTERY PACK (7.4V - 12V) ]
-         (+) Positive       (-) Negative (GND)
-             │                     │
-   ┌─────────┴─────────┐           ├───────────────────────────────┐
-   │                   │           │                               │
-   ▼                   ▼           ▼                               ▼
-Driver 1 (12V)    Driver 2 (12V)  Driver 1 (GND) ── Driver 2 (GND) ── ESP32 (GND)
-   │                   │
-   └──────[ 5V ]───────┘ (Regulated 5V from Driver 1 with 5V Jumper ON)
-             │
-             ▼
-        ESP32 (VIN)   <--- Power ESP32 from Driver's 5V out OR use USB Power Bank
-```
+| Breadboard Row | Signal Name | ESP32 Pin | Driver 1 (Front/Left) | Driver 2 (Rear/Right) | Description |
+| :---: | :---: | :---: | :---: | :---: | :--- |
+| **Blue (-) Rail** | **COMMON GND** | `GND` | `GND` terminal | `GND` terminal | **Tied with Battery (-)** |
+| **Red (+) Rail** | **BATTERY POWER** | — | `12V` terminal | `12V` terminal | **Tied with Battery (+)** |
+| **Row 1** | **Left Speed** | `D14` (GPIO 14) | `ENA` | `ENA` | Left PWM Speed Control |
+| **Row 2** | **Left Forward** | `D27` (GPIO 27) | `IN1` | `IN1` | Left Wheels Forward |
+| **Row 3** | **Left Backward** | `D26` (GPIO 26) | `IN2` | `IN2` | Left Wheels Backward |
+| **Row 4** | **Right Forward** | `D25` (GPIO 25) | `IN3` | `IN3` | Right Wheels Forward |
+| **Row 5** | **Right Backward** | `D33` (GPIO 33) | `IN4` | `IN4` | Right Wheels Backward |
+| **Row 6** | **Right Speed** | `D32` (GPIO 32) | `ENB` | `ENB` | Right PWM Speed Control |
 
-1. **Battery (+) Positive wire**:
-   - Goes into Driver 1 `12V` (or `VMS`) terminal AND Driver 2 `12V` terminal.
-2. **Battery (-) Negative wire**:
-   - Goes into Driver 1 `GND` terminal, Driver 2 `GND` terminal, and the **ESP32 GND pin** on your breadboard.
-3. **Powering the ESP32**:
-   - **Method 1 (Recommended for testing)**: Power the ESP32 via a standard USB cable/power bank to its Micro-USB port. (Remember: keep battery GND tied to ESP32 GND!).
-   - **Method 2 (Standalone)**: With the black 5V regulator jumper in place on Driver 1, connect the **5V terminal** of Driver 1 to the **VIN pin** of the ESP32.
+> 💡 **Driver 1 & 2 Roles:**
+> - **Driver 1**: Controls the **Front Motors** (Left Wheel on OUT1/OUT2, Right Wheel on OUT3/OUT4).
+> - **Driver 2**: Controls the **Rear Motors** (Left Wheel on OUT1/OUT2, Right Wheel on OUT3/OUT4).
+> - Because Row 2 (`D27`) feeds `IN1` on **both** drivers, Front-Left and Rear-Left always spin forward together!
+> - Because Row 4 (`D25`) feeds `IN3` on **both** drivers, Front-Right and Rear-Right always spin forward together!
+
+---
+
+### B. Motor Driver Screw Terminals to Wheels
+
+#### Driver 1 (Front Axle):
+- **OUT1 & OUT2** (Screw Terminal Block 1) ➔ **Front-Left Motor** (Red & Black wires)
+- **OUT3 & OUT4** (Screw Terminal Block 2) ➔ **Front-Right Motor** (Red & Black wires)
+
+#### Driver 2 (Rear Axle):
+- **OUT1 & OUT2** (Screw Terminal Block 1) ➔ **Rear-Left Motor** (Red & Black wires)
+- **OUT3 & OUT4** (Screw Terminal Block 2) ➔ **Rear-Right Motor** (Red & Black wires)
+
+---
+
+### C. Power & Common Ground Distribution (Eliminating Twisted Wires)
+
+Instead of twisting loose wires together by hand, use the breadboard side rails:
+
+1. **Battery Negative (-) Wire** ➔ Plug into Breadboard **Blue Rail (`-`)**.
+2. **From Blue Rail (`-`)**, run 3 jumper wires:
+   - Jumper 1 ➔ Driver 1 `GND` terminal.
+   - Jumper 2 ➔ Driver 2 `GND` terminal.
+   - Jumper 3 ➔ ESP32 `GND` pin.
+3. **Battery Positive (+) Wire** ➔ Plug into Breadboard **Red Rail (`+`)**.
+4. **From Red Rail (`+`)**, run 2 jumper wires:
+   - Jumper 1 ➔ Driver 1 `12V` (or `VMS`) terminal.
+   - Jumper 2 ➔ Driver 2 `12V` (or `VMS`) terminal.
+5. **Powering the ESP32**:
+   - **Recommended**: Power the ESP32 via a USB cable connected to a 5V power bank or laptop.
+   - **Standalone**: Take a wire from Driver 1's `5V` terminal (with the black 5V regulator jumper ON) and connect it to ESP32 **VIN** pin.
 
 ---
 
 ### D. ENA & ENB Jumpers Explained
 
-Look closely at the 6 pins (`ENA`, `IN1`, `IN2`, `IN3`, `IN4`, `ENB`) on each L298N board:
-- By default, they come with a small **black plastic jumper cap** bridging `ENA` to 5V and `ENB` to 5V.
-- **If the jumpers are KEPT ON**: The motors run at 100% full speed all the time. You only need to connect `IN1`, `IN2`, `IN3`, `IN4`. In the code, set `const bool ENABLE_SPEED_CONTROL = false;`.
-- **If the jumpers are REMOVED**: You can connect `ENA` to ESP32 `D14` and `ENB` to ESP32 `D32`. This allows variable speed control (0-255 PWM) and the speed buttons (0-9) will adjust speed in real time!
+Look at the 6-pin headers (`ENA`, `IN1`, `IN2`, `IN3`, `IN4`, `ENB`) on each L298N board:
+- **If you keep the black jumper caps ON ENA & ENB**:
+  - The motors run at 100% full speed all the time.
+  - You do not need Row 1 (`D14`) or Row 6 (`D32`).
+  - In `gaadi.ino`, set: `const bool ENABLE_SPEED_CONTROL = false;`
+- **If you REMOVE the black jumper caps**:
+  - Connect Row 1 (`D14`) to both `ENA` pins and Row 6 (`D32`) to both `ENB` pins.
+  - You can now change speed dynamically between 10% and 100% directly from the phone app!
 
 ---
 
