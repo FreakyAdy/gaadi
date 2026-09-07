@@ -1,0 +1,20 @@
+{
+  "configurations": [
+    {
+      "name": "ESP32",
+      "includePath": [
+        "${workspaceFolder}/**"
+      ],
+      "defines": [
+        "USBCON",
+        "ESP32",
+        "ARDUINO=10819",
+        "ARDUINO_ARCH_ESP32"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-msvc-x64"
+    }
+  ],
+  "version": 4
+}
